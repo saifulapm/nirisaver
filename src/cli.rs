@@ -28,7 +28,8 @@ pub struct Cli {
     #[arg(short, long, value_name = "PATH")]
     pub config: Option<PathBuf>,
 
-    /// Ignore the config file entirely and use defaults plus these flags
+    /// Ignore the config directory entirely — config.toml and the default
+    /// quote list both — and use the built-in defaults plus these flags
     #[arg(long)]
     pub no_config: bool,
 

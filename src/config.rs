@@ -155,7 +155,14 @@ impl Settings {
 /// Read the config file, fold the command line over it, and produce the one
 /// [`Settings`] the rest of the program runs on.
 pub fn resolve(cli: &Cli, env: &Env) -> Result<Settings> {
-    let config_dir = env.config_dir();
+    // `--no-config` means the whole config directory, not just config.toml.
+    // The quote list is configuration too, and a run that still picked it up
+    // would not be reproducible — which is the only reason to pass the flag.
+    // It matters more than it looks: a quote list makes `Content::Quotes`,
+    // which draws a random quote and so consumes an RNG value that
+    // `Content::Text` does not, shifting every later draw and with it the
+    // effect, the engine's seed and the whole run.
+    let config_dir = if cli.no_config { None } else { env.config_dir() };
     let file = load_file_config(cli, config_dir.as_deref())?;
     let mut settings = Settings::builtin();
 
@@ -453,6 +460,33 @@ mod tests {
         scratch.write("config.toml", "hold = 1000\n");
         let s = resolve(&cli(&["--no-config"]), &scratch.env()).unwrap();
         assert_eq!(s.hold, Duration::from_millis(DEFAULT_HOLD_MS));
+    }
+
+    #[test]
+    fn no_config_ignores_the_default_quote_list_too() {
+        // The flag exists to make a run reproducible, and a run that still
+        // read the machine's quote list would not be: quotes draw an RNG value
+        // that a plain text block does not, so the effect selection and every
+        // draw after it move. CI caught this as a headless checksum that
+        // differed between a laptop with a quote list and a runner without one.
+        let scratch = Scratch::new("noconfig-quotes");
+        scratch.write("quotes.txt", "One. — A\nTwo. — B\n");
+        let s = resolve(&cli(&["--no-config"]), &scratch.env()).unwrap();
+        assert_eq!(s.content, Content::Text(BUILTIN_TEXT.to_string()));
+    }
+
+    #[test]
+    fn no_config_still_honours_an_explicitly_named_quote_list() {
+        // Naming a file is not reading the config directory.
+        let scratch = Scratch::new("noconfig-explicit");
+        scratch.write("elsewhere.txt", "Named. — Someone\n");
+        let path = scratch.0.join("nirisaver").join("elsewhere.txt");
+        let s = resolve(&cli(&["--no-config", "--quotes", path.to_str().unwrap()]), &scratch.env())
+            .unwrap();
+        match s.content {
+            Content::Quotes(q) => assert_eq!(q.len(), 1),
+            other => panic!("expected quotes, got {other:?}"),
+        }
     }
 
     #[test]

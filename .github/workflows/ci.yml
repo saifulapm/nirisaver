@@ -52,15 +52,41 @@ jobs:
           done
 
       # Deterministic by construction: the same seed must print the same line
-      # on a CI runner as on a laptop. If a constructor ever starts consulting
-      # $XDG_CONFIG_HOME on its way to a default, this is what notices.
+      # on a CI runner as on a laptop, whatever architecture either is and
+      # whatever is sitting in the config directory.
+      #
+      # The last clause is not hypothetical. The first version of this step
+      # failed because `--no-config` skipped config.toml but still read the
+      # default quote list, and a quote list draws an RNG value that a plain
+      # text block does not — so every later draw shifted, and a machine with
+      # quotes installed picked a different effect from one without. A bare
+      # runner has no config directory, so the populated case is checked
+      # explicitly or a reintroduction would sail through.
       - name: Headless determinism
         run: |
           cargo build --release
-          BIN=build/rust/release/nirisaver
+          BIN="$PWD/build/rust/release/nirisaver"
           FLAGS="--no-config --headless --frames 400 --cols 72 --rows 20 --seed 4242 --hold 500"
-          first=$($BIN $FLAGS)
-          second=$($BIN $FLAGS)
-          echo "$first"
-          test "$first" = "$second"
-          test "$first" = "grid=72x20 presented=400 engine-frames=447 cycles=3 cells-changed=5291 last-effect=randomsequence checksum=8713bcdd4a44ab2e"
+          EXPECTED="grid=72x20 presented=400 engine-frames=637 cycles=1 cells-changed=3793 last-effect=rings checksum=6896f6a1c70f5737"
+
+          bare=$($BIN $FLAGS)
+          echo "bare:      $bare"
+          test "$bare" = "$(_=1 $BIN $FLAGS)"   # repeatable
+
+          # A config directory that would change everything, if it leaked.
+          stuffed=$(mktemp -d)
+          mkdir -p "$stuffed/nirisaver"
+          printf 'Leaked. — Nobody\nAlso leaked. — No one\n' > "$stuffed/nirisaver/quotes.txt"
+          printf 'hold = 1\nwrap = 11\neffect = "matrix"\n' > "$stuffed/nirisaver/config.toml"
+          leaky=$(XDG_CONFIG_HOME="$stuffed" HOME="$stuffed" $BIN $FLAGS)
+          echo "populated: $leaky"
+
+          test "$bare" = "$EXPECTED"
+          test "$leaky" = "$EXPECTED"
+
+          # And the same directory *without* --no-config must be picked up,
+          # or the check above would pass for the wrong reason.
+          used=$(XDG_CONFIG_HOME="$stuffed" HOME="$stuffed" $BIN --headless --frames 400 \
+                   --cols 72 --rows 20 --seed 4242 --hold 500)
+          echo "honoured:  $used"
+          test "$used" != "$EXPECTED"

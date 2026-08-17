@@ -182,11 +182,18 @@ fixed string, which is how the layout and content logic are tested in CI:
 
 ```console
 $ nirisaver --no-config --headless --frames 400 --cols 72 --rows 20 --seed 4242 --hold 500
-grid=72x20 presented=400 engine-frames=447 cycles=3 cells-changed=5291 last-effect=randomsequence checksum=8713bcdd4a44ab2e
+grid=72x20 presented=400 engine-frames=637 cycles=1 cells-changed=3793 last-effect=rings checksum=6896f6a1c70f5737
 ```
 
 `--dump-grid` prints the final cell grid underneath, which is the quickest way
 to check a wrap measure or a separator without putting anything on screen.
+
+That line is the same on any machine and any architecture — CI asserts it
+character for character on x86_64, and it is what an arm64 laptop prints.
+`--no-config` is what makes it so: it ignores the whole config directory,
+config.toml and the default quote list both. Half-doing that was a real bug —
+a quote list draws an RNG value that a plain text block does not, so a machine
+with quotes installed diverged from one without on the very first effect.
 
 ## Effects
 
