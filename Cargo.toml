@@ -15,7 +15,11 @@ fontdue = "0.9"
 rustix = { version = "1", features = ["fs", "pipe", "event"] }
 serde = { version = "1", features = ["derive"] }
 signal-hook = { version = "0.3", default-features = false }
-smithay-client-toolkit = "0.21"
+# default-features = false drops the toolkit's `xkbcommon` feature, and with
+# it a pkg-config build dependency and a libxkbcommon link. This program never
+# translates a keysym — see the wl_keyboard Dispatch impl in src/wayland.rs.
+# `calloop` goes too: the event loop here is a hand-written poll.
+smithay-client-toolkit = { version = "0.21", default-features = false }
 toml = "0.8"
 ttfx = { git = "https://github.com/omacom-io/ttfx", rev = "6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a" }
 wayland-client = "0.31"

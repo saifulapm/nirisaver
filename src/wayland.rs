@@ -35,9 +35,6 @@ use smithay_client_toolkit::compositor::{
 };
 use smithay_client_toolkit::output::{OutputHandler, OutputState};
 use smithay_client_toolkit::registry::{ProvidesRegistryState, RegistryState};
-use smithay_client_toolkit::seat::keyboard::{
-    KeyEvent, KeyboardHandler, Keysym, Modifiers, RawModifiers,
-};
 use smithay_client_toolkit::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
 use smithay_client_toolkit::seat::{Capability, SeatHandler, SeatState};
 use smithay_client_toolkit::shell::wlr_layer::{
@@ -50,7 +47,7 @@ use smithay_client_toolkit::shm::{Shm, ShmHandler};
 use smithay_client_toolkit::{delegate_dispatch2, delegate_registry, registry_handlers};
 use wayland_client::globals::registry_queue_init;
 use wayland_client::protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface};
-use wayland_client::{Connection, QueueHandle};
+use wayland_client::{Connection, Dispatch, QueueHandle};
 
 use crate::config::Settings;
 use crate::engine::{Advance, Animation, Animator};
@@ -826,7 +823,10 @@ impl SeatHandler for Overlay {
         capability: Capability,
     ) {
         if capability == Capability::Keyboard && self.keyboard.is_none() {
-            self.keyboard = self.seat_state.get_keyboard(qh, &seat, None).ok();
+            // Straight off the seat rather than through SeatState::get_keyboard,
+            // which lives behind the toolkit's `xkbcommon` feature. See the
+            // Dispatch impl below for why that feature is off.
+            self.keyboard = Some(seat.get_keyboard(qh, ()));
         }
         if capability == Capability::Pointer && self.pointer.is_none() {
             self.pointer = self.seat_state.get_pointer(qh, &seat).ok();
@@ -855,72 +855,38 @@ impl SeatHandler for Overlay {
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
 }
 
-impl KeyboardHandler for Overlay {
-    fn enter(
-        &mut self,
+/// Keyboard input, straight off the wire.
+///
+/// The toolkit's keyboard support sits behind its `xkbcommon` feature, which
+/// costs a `pkg-config` lookup for `xkbcommon` at build time and a link
+/// against `libxkbcommon.so` at run time. That buys keymap compilation and
+/// keysym translation — a full answer to "which character did they type".
+///
+/// This program's entire keyboard requirement is "did a key go down", so the
+/// feature is off and `wl_keyboard` is dispatched by hand. Everything else the
+/// protocol sends is dropped, the keymap file descriptor included: it arrives
+/// owned, and dropping it closes it.
+///
+/// The saving is not theoretical. Without this, building nirisaver needs
+/// `libxkbcommon-devel` (or `libxkbcommon-dev`) present, which is not a
+/// dependency a screensaver should impose on a source install — and is exactly
+/// what CI caught, since a stock runner has no reason to have it.
+impl Dispatch<wl_keyboard::WlKeyboard, ()> for Overlay {
+    fn event(
+        state: &mut Self,
+        _: &wl_keyboard::WlKeyboard,
+        event: wl_keyboard::Event,
+        _: &(),
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: &wl_surface::WlSurface,
-        _: u32,
-        _: &[u32],
-        _: &[Keysym],
     ) {
-    }
-
-    fn leave(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: &wl_surface::WlSurface,
-        _: u32,
-    ) {
-    }
-
-    fn press_key(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
-        _: KeyEvent,
-    ) {
-        if self.input_is_live() {
-            self.dismiss();
+        if let wl_keyboard::Event::Key { state: key_state, .. } = event {
+            let pressed =
+                matches!(key_state, wayland_client::WEnum::Value(wl_keyboard::KeyState::Pressed));
+            if pressed && state.input_is_live() {
+                state.dismiss();
+            }
         }
-    }
-
-    fn release_key(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
-        _: KeyEvent,
-    ) {
-    }
-
-    fn repeat_key(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
-        _: KeyEvent,
-    ) {
-    }
-
-    fn update_modifiers(
-        &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
-        _: Modifiers,
-        _: RawModifiers,
-        _: u32,
-    ) {
     }
 }
 

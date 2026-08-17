@@ -33,6 +33,24 @@ jobs:
       - name: Tests
         run: cargo test --all-targets
 
+      # The install instructions promise a Rust toolchain and nothing else. A
+      # stock runner has no libxkbcommon, no pkg-config lookup for it and no
+      # Qt or GTK development packages to drag it in, so a build that starts
+      # needing one fails here rather than on someone's machine. Asserting the
+      # link explicitly, because the toolkit re-enabling its default features
+      # would otherwise only show up as a build error on a slimmer runner.
+      - name: No system library dependencies
+        run: |
+          cargo build --release
+          ldd build/rust/release/nirisaver
+          ! ldd build/rust/release/nirisaver | grep -qi xkbcommon
+          for lib in $(ldd build/rust/release/nirisaver | awk '{print $1}' | grep '^lib'); do
+            case "$lib" in
+              libc.so.*|libm.so.*|libgcc_s.so.*|libdl.so.*|libpthread.so.*) ;;
+              *) echo "unexpected system library: $lib"; exit 1 ;;
+            esac
+          done
+
       # Deterministic by construction: the same seed must print the same line
       # on a CI runner as on a laptop. If a constructor ever starts consulting
       # $XDG_CONFIG_HOME on its way to a default, this is what notices.
