@@ -1,0 +1,100 @@
+# nirisaver — copy to ~/.config/nirisaver/config.toml and edit.
+#
+# Every key is optional; the values shown are the defaults. Every key has a
+# command-line flag of the same name that overrides it (`nirisaver --help`).
+# A missing config file is fine. An unknown key is an error, so a typo is a
+# message rather than a setting that silently does nothing.
+
+# What to animate: "quotes" or "text". Naming `text` or `text-file` below
+# implies "text", so this rarely needs saying.
+source = "quotes"
+
+# --- quotes ------------------------------------------------------------------
+
+# One quotation per line, "text <separator> author". Blank lines and lines
+# starting with `#` are ignored, so a long list can be sectioned and annotated.
+#
+# Left unset, ~/.config/nirisaver/quotes.txt is read if it exists — dropping a
+# file there turns quotes on with no configuration at all. Set explicitly, a
+# file that cannot be read is an error: the two cases fail differently on
+# purpose, because not having adopted a convention is not a mistake.
+# quotes = "~/.config/nirisaver/quotes.txt"
+
+# What splits a quotation from its attribution. Matched from the right, so a
+# quotation containing an em dash of its own still attributes correctly.
+separator = " — "
+
+# What the attribution line opens with once it has been moved onto its own
+# line. Separate from the separator on purpose: a list can use " | " as its
+# field separator and still want a dash on screen.
+attribution-prefix = "— "
+
+# --- custom text -------------------------------------------------------------
+
+# A single block, replayed every cycle. Inline:
+# text = "be excellent to each other"
+# or from a file, whose own line breaks are honoured:
+# text-file = "~/.config/nirisaver/banner.txt"
+
+# --- typography --------------------------------------------------------------
+
+# Wrap measure, in columns. The attribution moves to its own line and the whole
+# block is centred on the canvas.
+wrap = 64
+
+# How wrapped lines sit against each other: "center" or "left".
+align = "center"
+
+# Logical pixels, before output scaling. On a scale-2 output the glyphs are
+# rasterized at twice this.
+font-size = 18.0
+
+# Cell height as a multiple of the font's own line height. 1.0 keeps the design
+# value, which is what makes the block-drawing symbols several effects are
+# built from tile without seams.
+line-height = 1.0
+
+# Any TrueType or OpenType font. Unset uses the bundled JetBrains Mono.
+# font = "/usr/share/fonts/jetbrains-mono-fonts/JetBrainsMono-Regular.otf"
+
+background = "#000000"
+
+# Used for text an effect leaves unstyled; effects that set their own colours
+# override it.
+foreground = "#ebebeb"
+
+# --- timing ------------------------------------------------------------------
+
+# How long a finished frame stays readable before the next cycle begins, in ms.
+# A paragraph of prose wants longer on screen than a word does. The hold costs
+# nothing: no frame is produced at all while it runs.
+hold = 14000
+
+fade-in = 700
+fade-out = 250
+
+# Animation frames per second. This is the simulation clock, not a refresh
+# rate — a slower value makes effects take longer, not look worse.
+frame-rate = 30
+
+# --- effects -----------------------------------------------------------------
+
+# Pick at most one of the three shapes below. With none of them, every cycle
+# draws a random effect from the whole registry (`nirisaver --list-effects`).
+
+# Pin one effect for every cycle:
+# effect = "matrix"
+
+# Or draw only from these:
+# include-effects = ["beams", "rain", "waves", "pour"]
+
+# Or draw from everything except these. `smoke` and `beams` are by far the
+# heaviest on memory at a large canvas; excluding them is the lever if that
+# matters on your machine.
+# exclude-effects = ["smoke", "beams"]
+
+# --- reproducibility ---------------------------------------------------------
+
+# Replay a run exactly — which quotation, which effect, every frame. Unset, a
+# fresh seed is drawn at startup.
+# seed = 1234

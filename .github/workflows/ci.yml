@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TARGET_DIR: build/rust
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Everything above the Wayland module is compositor-free, so this covers
+      # the VT parser, the layout, the damage tracking and the incremental
+      # rasterizer without a display server. The bench target's smoke path runs
+      # here too and compares the incremental buffer against a full-frame
+      # oracle.
+      - name: Tests
+        run: cargo test --all-targets
+
+      # Deterministic by construction: the same seed must print the same line
+      # on a CI runner as on a laptop. If a constructor ever starts consulting
+      # $XDG_CONFIG_HOME on its way to a default, this is what notices.
+      - name: Headless determinism
+        run: |
+          cargo build --release
+          BIN=build/rust/release/nirisaver
+          FLAGS="--no-config --headless --frames 400 --cols 72 --rows 20 --seed 4242 --hold 500"
+          first=$($BIN $FLAGS)
+          second=$($BIN $FLAGS)
+          echo "$first"
+          test "$first" = "$second"
+          test "$first" = "grid=72x20 presented=400 engine-frames=447 cycles=3 cells-changed=5291 last-effect=randomsequence checksum=8713bcdd4a44ab2e"
