@@ -1,0 +1,30 @@
+[package]
+name = "nirisaver"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85"
+description = "A Wayland screensaver for niri: animated text effects on a layer-shell overlay"
+license = "MIT"
+repository = "https://github.com/saifulapm/nirisaver"
+publish = false
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+fontdue = "0.9"
+rustix = { version = "1", features = ["fs", "pipe", "event"] }
+serde = { version = "1", features = ["derive"] }
+signal-hook = { version = "0.3", default-features = false }
+smithay-client-toolkit = "0.21"
+toml = "0.8"
+ttfx = { git = "https://github.com/omacom-io/ttfx", rev = "6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a" }
+wayland-client = "0.31"
+
+[[bench]]
+name = "render"
+harness = false
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = true
